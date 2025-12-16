@@ -6,6 +6,7 @@
 # History and sessions (personal data)
 history/
 sessions/
+mcp-servers/
 
 # Temporary files
 *.tmp
