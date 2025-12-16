@@ -1,0 +1,45 @@
+# Personal AI Infrastructure - Git Ignore
+
+# Environment variables (NEVER commit!)
+.env
+
+# History and sessions (personal data)
+history/
+sessions/
+
+# Temporary files
+*.tmp
+*.log
+*.cache
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+venv/
+.venv/
+
+# PowerShell
+*.ps1xml
+
+# Personal overrides
+settings.local.json
+config.local.json
+
+# GUI-specific settings (user copies from .example files)
+settings.claudecode.json
+settings.cherrystudio.json
+settings.librechat.json
+# Keep .example files in git
