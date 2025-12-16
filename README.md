@@ -1,1 +1,1 @@
-# Personal-AI-Infrastructure-PAI-for-Windows
+Personal_AI_Infrastructure_PAI_for_Windows
