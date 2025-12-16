@@ -5,16 +5,17 @@
 
 .DESCRIPTION
     Sets up PAI for first-time use:
-    - Detects platform (Windows/Linux)
     - Creates .env from template (optional)
     - Configures paths
     - Validates prerequisites
+    - Windows 11 + PowerShell 7.5 optimized
 
 .EXAMPLE
     ./Initialize-PAI.ps1
 
 .NOTES
-    Cross-platform: Works on Windows and Linux with PowerShell 7.0+
+    Platform: Windows 11
+    PowerShell: 7.5+
     API keys should be set as system environment variables, not in .env
 #>
 
@@ -28,12 +29,9 @@ Push-Location $PAI_ROOT
 Write-Host "🚀 Initializing Personal AI Infrastructure (PAI)" -ForegroundColor Cyan
 Write-Host ""
 
-# Detect platform
-$IsWindows = $PSVersionTable.Platform -eq 'Win32NT' -or [System.Environment]::OSVersion.Platform -eq 'Win32NT'
-$IsLinux = $PSVersionTable.Platform -eq 'Unix'
-
+# Platform info
 Write-Host "📋 Platform Detection:" -ForegroundColor Yellow
-Write-Host "   OS: $(if ($IsWindows) { 'Windows' } else { 'Linux' })"
+Write-Host "   OS: Windows"
 Write-Host "   PowerShell: $($PSVersionTable.PSVersion)"
 Write-Host "   PAI Root: $PAI_ROOT"
 Write-Host ""
@@ -50,10 +48,8 @@ if (-not (Test-Path ".env")) {
     Copy-Item ".env.example" ".env"
     
     # Set PAI_ROOT in .env (replace %USERPROFILE% with actual path)
-    if ($IsWindows) {
-        $userProfile = $env:USERPROFILE
-        (Get-Content ".env") -replace '%USERPROFILE%\\.', $userProfile | Set-Content ".env"
-    }
+    $userProfile = $env:USERPROFILE
+    (Get-Content ".env") -replace '%USERPROFILE%\\.', $userProfile | Set-Content ".env"
     
     Write-Host "   ✅ Created .env (API keys should be system env vars!)" -ForegroundColor Green
 } else {
@@ -66,8 +62,8 @@ if (-not (Test-Path "history")) {
     Write-Host "   ✅ Created history directory" -ForegroundColor Green
 }
 
-# Create temp directory (Windows)
-if ($IsWindows -and -not (Test-Path "C:\Temp")) {
+# Create temp directory
+if (-not (Test-Path "C:\Temp")) {
     New-Item -ItemType Directory -Path "C:\Temp" | Out-Null
     Write-Host "   ✅ Created C:\Temp" -ForegroundColor Green
 }
