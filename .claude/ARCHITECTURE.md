@@ -133,12 +133,19 @@ AI: Continues with task
 
 **Example**: `agents/assistant.md`
 
-**Optional frontmatter** for customization:
+**Frontmatter for metadata and control**:
 ```markdown
 ---
-name: "assistant"
-personality_type: "INTP"
-response_style: "concise"
+name: assistant
+description: General-purpose AI assistant
+# model: sonnet  # Commented out - GUI chooses model
+# voiceId: Ava (Premium)  # Commented out - enable if using voice
+color: blue
+permissions:  # May be GUI-specific
+  allow:
+    - "Bash"
+    - "Read(*)"
+    - "Write(*)"
 ---
 
 # Assistant Agent
@@ -147,13 +154,53 @@ Description and behavior...
 
 **What it contains:**
 - Agent description and behavior
-- Optional: Personality type, communication style, preferences
+- Metadata: name, description, color
+- Optional: voiceId (commented out by default)
+- Permissions (GUI-specific, may not apply to all clients)
+
+**Key Design Decisions:**
+- `model` is commented out - GUI selects model dynamically
+- `voiceId` is commented out - enable only if using voice features
+- `permissions` may be specific to certain GUIs (e.g., Claude Code)
 
 **Why flat files?**
 - Simple, readable, single source of truth
 - Same approach as Daniel's PAI
 - Easy to add/edit agents
 - AI reads markdown directly
+
+### Layer 2.5: Voice Notification System (Optional)
+
+**Feature Flag**: `settings.json → features.voice.enabled`
+
+**Purpose**: Allow agents to announce task completion audibly
+
+**Configuration**:
+```json
+"features": {
+  "voice": {
+    "enabled": false,
+    "server_url": "http://localhost:8888/notify",
+    "default_rate": 260
+  }
+}
+```
+
+**Requirements**:
+- Separate voice notification server (custom, not included with PAI)
+- Server must accept POST requests with JSON payload
+- Agents check `enabled` flag before making curl requests
+
+**Agent Implementation**:
+Agents include conditional voice notification code:
+```bash
+# Only executes if voice is enabled in settings.json
+curl -X POST http://localhost:8888/notify \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Task completed","rate":260,"voice_enabled":true}'
+```
+
+**Status**: Disabled by default, optional feature
 
 ### Layer 3: Secrets (.env)
 

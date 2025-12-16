@@ -1,6 +1,6 @@
 {
   "_version": "1.0.0",
-  "_comment": "For GUI-specific configs, see settings.*.example.json files",
+  "_comment": "Core PAI settings. For GUI-specific configs, see settings.*.example.json files",
   
   "paths": {
     "pai_root": "${PAI_ROOT}",
@@ -20,5 +20,13 @@
     "assistant_name": "Clippy",
     "agent": "assistant",
     "skills_always_load": ["CORE"]
+  },
+  
+  "features": {
+    "voice": {
+      "enabled": false,
+      "server_url": "http://localhost:8888/notify",
+      "default_rate": 260
+    }
   }
 }
