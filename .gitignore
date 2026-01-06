@@ -1,0 +1,202 @@
+# PAI Windows v2 - Git Ignore Rules
+
+# ==============================================
+# USER-SPECIFIC DATA (NEVER COMMIT)
+# ==============================================
+
+# Environment variables (contains API keys, secrets)
+.env
+*.env
+!.env.example
+
+# Session history (personal data)
+history/
+*.jsonl
+
+# User workspace (if accidentally placed in repo)
+.claude/
+
+# ==============================================
+# PAI SYSTEM GENERATED
+# ==============================================
+
+# Update staging directory
+pai_updates/
+
+# Backup directory
+pai_backups/
+
+# Sync history tracking
+.pai-sync-history
+
+# ==============================================
+# WINDOWS SYSTEM FILES
+# ==============================================
+
+# Windows thumbnail cache
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Windows shortcuts
+*.lnk
+
+# Recycle Bin
+$RECYCLE.BIN/
+
+# Windows Installer files
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# ==============================================
+# POWERSHELL
+# ==============================================
+
+# PowerShell transcript files
+PowerShell_transcript.*.txt
+
+# PowerShell module cache
+PSGetModuleInfo.xml
+
+# ==============================================
+# IDE / EDITOR SPECIFIC
+# ==============================================
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs (Rider, WebStorm, etc.)
+.idea/
+*.iml
+*.iws
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# ==============================================
+# NODE / JAVASCRIPT (if used for tools)
+# ==============================================
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# ==============================================
+# PYTHON (if used for tools)
+# ==============================================
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+
+# ==============================================
+# LOGS & TEMPORARY FILES
+# ==============================================
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Cache directories
+.cache/
+cache/
+
+# ==============================================
+# BACKUPS
+# ==============================================
+
+*.bak
+*.backup
+*.old
+*~
+
+# ==============================================
+# COMPRESSION / ARCHIVES
+# ==============================================
+
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# ==============================================
+# OS SPECIFIC
+# ==============================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+
+# ==============================================
+# SECURITY & SENSITIVE DATA
+# ==============================================
+
+# API keys and credentials
+*secret*
+*password*
+*credentials*
+*.pem
+*.key
+*.cert
+
+# Exclude from the above: example files
+!.env.example
+!*example*
+
+# ==============================================
+# BUILD ARTIFACTS
+# ==============================================
+
+dist/
+build/
+out/
+bin/
+obj/
+
+# ==============================================
+# TESTING
+# ==============================================
+
+coverage/
+.nyc_output/
+test-results/
+*.test.log
