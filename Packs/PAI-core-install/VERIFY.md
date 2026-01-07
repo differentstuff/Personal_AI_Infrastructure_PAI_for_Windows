@@ -198,11 +198,11 @@ if (Test-Path $env:OneDrive) {
     Write-Host "❌ OneDrive path not found" -ForegroundColor Red
 }
 
-$PAI_ROOT = $env:PAI_ROOT
-if ($PAI_ROOT) {
-    Write-Host "✅ PAI_ROOT environment variable set: $PAI_ROOT" -ForegroundColor Green
+$PAI_DIR = $env:PAI_DIR
+if ($PAI_DIR) {
+    Write-Host "✅ PAI_DIR environment variable set: $PAI_DIR" -ForegroundColor Green
 } else {
-    Write-Host "⚠️ PAI_ROOT not set (will use settings.json paths)" -ForegroundColor Yellow
+    Write-Host "⚠️ PAI_DIR not set (will use settings.json paths)" -ForegroundColor Yellow
 }
 ```
 

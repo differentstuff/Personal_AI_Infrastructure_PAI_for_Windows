@@ -16,7 +16,7 @@ import { readdir, readFile, writeFile, appendFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
-const PAI_DIR = process.env.PAI_ROOT || process.env.PAI_DIR || join(process.env.HOME || '', '.claude');
+const PAI_DIR = process.env.PAI_DIR || join(process.env.HOME || '', '.claude');
 const ARCHITECTURE_FILE = join(PAI_DIR, 'skills', 'CORE', 'PaiArchitecture.md');
 const BUNDLES_FILE = join(PAI_DIR, '.installed-bundles.json');
 const UPGRADES_FILE = join(PAI_DIR, 'history', 'Upgrades.jsonl');

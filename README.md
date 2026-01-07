@@ -44,7 +44,7 @@ winget install Microsoft.PowerShell
 **2. Clone or download this repository:**
 ```powershell
 cd C:\Temp
-git clone <your-repo-url> PAI_Windows_v2
+git clone https://github.com/differentstuff/Personal_AI_Infrastructure_PAI_for_Windows.git PAI_Windows_v2
 ```
 *Alternative: Download ZIP and extract to `C:\Temp\PAI_Windows_v2`*
 

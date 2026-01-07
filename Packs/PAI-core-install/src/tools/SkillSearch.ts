@@ -13,7 +13,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
-const PAI_DIR = process.env.PAI_ROOT || process.env.PAI_DIR || join(process.env.HOME || '', '.claude');
+const PAI_DIR = process.env.PAI_DIR || join(process.env.HOME || '', '.claude');
 const INDEX_FILE = join(PAI_DIR, 'skills', 'skill-index.json');
 
 interface SkillEntry {

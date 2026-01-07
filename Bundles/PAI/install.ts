@@ -1,27 +1,44 @@
 #!/usr/bin/env bun
 /**
- * PAI Bundle Installation Wizard for Windows v2.0.0
+ * PAI Installation Wizard for Windows
  *
- * Windows-native interactive CLI wizard for setting up the PAI bundle.
+ * Windows-native interactive CLI wizard for setting up PAI.
  * Auto-detects AI system directories and creates safety backups.
- * Uses Bun runtime for cross-platform TypeScript execution.
+ * Uses Bun runtime for TypeScript execution.
  *
- * Platform: Windows 11 + Bun
+ * Platform: Windows 11 + PowerShell 7.5+
  * 
  * Usage:
- *   bun run install.ts           # Fresh install with backup
- *   bun run install.ts --update  # Update existing installation (no backup, preserves config)
+ *   bun run install.ts --install-dir=C:/path/to/dir
  */
 
 import { $ } from "bun";
 import * as readline from "readline";
 import { existsSync } from "fs";
+import { mkdir } from "fs/promises";
 
 // =============================================================================
-// UPDATE MODE DETECTION
+// COMMAND LINE ARGUMENT PARSING
 // =============================================================================
 
-const isUpdateMode = process.argv.includes("--update") || process.argv.includes("-u");
+function parseInstallDir(): string {
+  const args = process.argv.slice(2);
+  for (const arg of args) {
+    if (arg.startsWith("--install-dir=")) {
+      return arg.substring("--install-dir=".length);
+    }
+  }
+  
+  // Fallback: Use PAI_DIR environment variable
+  const paiDir = process.env.PAI_DIR;
+  if (paiDir) {
+    return paiDir.replace(/\\/g, "/");
+  }
+  
+  // Default fallback
+  const userProfile = process.env.USERPROFILE || process.env.HOME;
+  return `${userProfile}/.claude`.replace(/\\/g, "/");
+}
 
 // =============================================================================
 // TYPES
@@ -34,11 +51,12 @@ interface AISystem {
 }
 
 interface WizardConfig {
-  daName: string;
+  assistantName: string;
   timeZone: string;
   userName: string;
   elevenLabsApiKey?: string;
   elevenLabsVoiceId?: string;
+  installDir: string;
 }
 
 // =============================================================================
@@ -86,95 +104,29 @@ function printHeader(title: string) {
 }
 
 // =============================================================================
-// EXISTING CONFIG DETECTION
-// =============================================================================
-
-interface ExistingConfig {
-  daName?: string;
-  timeZone?: string;
-  userName?: string;
-  elevenLabsApiKey?: string;
-  elevenLabsVoiceId?: string;
-}
-
-async function readExistingConfig(): Promise<ExistingConfig> {
-  // Windows-specific: Default to OneDrive\.claude
-  const onedrive = process.env.ONEDRIVE || process.env.OneDrive;
-  const home = process.env.USERPROFILE || process.env.HOME;
-  const claudeDir = process.env.PAI_DIR || `${onedrive}\\.claude` || `${home}\\.claude`;
-  const config: ExistingConfig = {};
-
-  // Try to read from .env file
-  try {
-    const envPath = `${claudeDir}/.env`;
-    if (existsSync(envPath)) {
-      const envContent = await Bun.file(envPath).text();
-      const lines = envContent.split("\n");
-      for (const line of lines) {
-        const match = line.match(/^([A-Z_]+)=(.*)$/);
-        if (match) {
-          const [, key, value] = match;
-          switch (key) {
-            case "DA":
-              config.daName = value;
-              break;
-            case "TIME_ZONE":
-              config.timeZone = value;
-              break;
-            case "ELEVENLABS_API_KEY":
-              config.elevenLabsApiKey = value;
-              break;
-            case "ELEVENLABS_VOICE_ID":
-              config.elevenLabsVoiceId = value;
-              break;
-          }
-        }
-      }
-    }
-  } catch {
-    // No .env file, continue with empty config
-  }
-
-  // Try to read userName from SKILL.md
-  try {
-    const skillPath = `${claudeDir}/skills/CORE/SKILL.md`;
-    if (existsSync(skillPath)) {
-      const skillContent = await Bun.file(skillPath).text();
-      const userMatch = skillContent.match(/Role:\s*(\w+)'s AI assistant/);
-      if (userMatch) {
-        config.userName = userMatch[1];
-      }
-    }
-  } catch {
-    // No SKILL.md, continue
-  }
-
-  return config;
-}
-
-// =============================================================================
 // AI SYSTEM DETECTION
 // =============================================================================
 
 function detectAISystems(): AISystem[] {
-  // Windows-specific: Use USERPROFILE and OneDrive paths
-  const home = process.env.USERPROFILE || process.env.HOME;
+  const userProfile = process.env.USERPROFILE || process.env.HOME;
   const onedrive = process.env.ONEDRIVE || process.env.OneDrive;
   
   const systems: AISystem[] = [
-    { name: "Claude Code", dir: `${home}\\.claude`, exists: false },
-    { name: "Cherry Studio", dir: `${onedrive}\\.claude`, exists: false },
-    { name: "Cursor", dir: `${home}\\.cursor`, exists: false },
-    { name: "Windsurf", dir: `${home}\\.windsurf`, exists: false },
-    { name: "Cline", dir: `${home}\\.cline`, exists: false },
-    { name: "Continue", dir: `${home}\\.continue`, exists: false },
+    { name: "Claude Code", dir: `${userProfile}\\.claude`, exists: false },
+    { name: "Cherry Studio", dir: onedrive ? `${onedrive}\\.claude` : "", exists: false },
+    { name: "Cursor", dir: `${userProfile}\\.cursor`, exists: false },
+    { name: "Windsurf", dir: `${userProfile}\\.windsurf`, exists: false },
+    { name: "Cline", dir: `${userProfile}\\.cline`, exists: false },
+    { name: "Continue", dir: `${userProfile}\\.continue`, exists: false },
   ];
 
   for (const system of systems) {
-    system.exists = existsSync(system.dir);
+    if (system.dir) {
+      system.exists = existsSync(system.dir);
+    }
   }
 
-  return systems;
+  return systems.filter(s => s.dir);
 }
 
 function getDetectedSystems(systems: AISystem[]): AISystem[] {
@@ -185,106 +137,78 @@ function getDetectedSystems(systems: AISystem[]): AISystem[] {
 // BACKUP
 // =============================================================================
 
-async function detectAndBackup(): Promise<boolean> {
+async function detectAndBackup(installDir: string): Promise<boolean> {
   const allSystems = detectAISystems();
   const detectedSystems = getDetectedSystems(allSystems);
-  // Windows-specific: Default to OneDrive\.claude
-  const onedrive = process.env.ONEDRIVE || process.env.OneDrive;
-  const home = process.env.USERPROFILE || process.env.HOME;
-  const claudeDir = process.env.PAI_DIR || `${onedrive}\\.claude` || `${home}\\.claude`;
-  const backupDir = `${claudeDir}-BACKUP`;
-
-  // In update mode, skip backup entirely
-  if (isUpdateMode) {
-    if (!existsSync(claudeDir)) {
-      console.log("❌ Update mode requires an existing installation.");
-      console.log("   Run without --update for a fresh install.\n");
-      return false;
-    }
-    console.log("📦 Update mode: Preserving existing configuration.\n");
-    console.log("   ✓ Skipping backup (your files stay in place)");
-    console.log("   ✓ Will use existing .env values as defaults");
-    console.log("   ✓ Only updating infrastructure files\n");
-
-    const proceed = await askYesNo("Proceed with update?", true);
-    return proceed;
-  }
+  const backupDir = `${installDir}-BACKUP`;
 
   console.log("Scanning for existing AI system directories...\n");
 
-  // Show detection results
   if (detectedSystems.length === 0) {
-    console.log("  No existing AI system directories detected on Windows.");
-    console.log("  This will be a fresh installation.\n");
+    console.log("   [*] No existing AI system directories detected");
+    console.log("   [*] This will be a fresh installation\n");
   } else {
-    console.log("  Detected AI systems:");
+    console.log("   Detected AI systems:");
     for (const system of detectedSystems) {
-      const isClaude = system.dir === claudeDir;
-      const marker = isClaude ? " ← WILL BE BACKED UP" : "";
-      console.log(`    • ${system.name}: ${system.dir}${marker}`);
+      console.log(`      - ${system.name}: ${system.dir}`);
     }
     console.log();
   }
 
-  // Check if ~/.claude exists
-  const claudeExists = existsSync(claudeDir);
+  const paiExists = existsSync(installDir);
 
-  if (!claudeExists) {
-    console.log(`No existing .claude directory found at ${claudeDir}. Fresh install.\n`);
+  if (!paiExists) {
+    console.log(`   [*] No existing PAI found at ${installDir}`);
+    console.log(`   [*] Fresh installation\n`);
 
-    // Still ask for confirmation before proceeding
     const proceed = await askYesNo(
-      `Ready to install PAI to ${claudeDir}. Proceed?`,
+      `Ready to install PAI to ${installDir}. Proceed?`,
       true
     );
     if (!proceed) {
-      console.log("Installation cancelled.");
+      console.log("\n   [!] Installation cancelled\n");
       return false;
     }
     return true;
   }
 
-  // .claude exists - explain what will happen
   console.log("┌─────────────────────────────────────────────────────────────┐");
   console.log("│  SAFETY BACKUP                                              │");
   console.log("├─────────────────────────────────────────────────────────────┤");
   console.log("│                                                             │");
   console.log("│  The installer will:                                        │");
   console.log("│                                                             │");
-  console.log(`│  1. Copy your current ${claudeDir}                          │`);
-  console.log(`│     to ${backupDir}                                         │`);
-  console.log(`│  2. Install fresh PAI files into ${claudeDir}               │`);
+  console.log(`│  1. Copy your current ${installDir.padEnd(40)} │`);
+  console.log(`│     to ${backupDir.padEnd(53)} │`);
+  console.log(`│  2. Install fresh PAI files into ${installDir.padEnd(26)} │`);
   console.log("│                                                             │");
   console.log("│  Your original files will be preserved in the backup.       │");
   console.log("│                                                             │");
   console.log("└─────────────────────────────────────────────────────────────┘");
   console.log();
 
-  // Check for existing backup
   if (existsSync(backupDir)) {
-    console.log(`⚠️  Existing backup found at ${backupDir}`);
-    const overwrite = await askYesNo("Overwrite existing backup?", false);
+    console.log(`   [!] Existing backup found at ${backupDir}`);
+    const overwrite = await askYesNo("   Overwrite existing backup?", false);
     if (!overwrite) {
-      console.log("Please manually remove or rename the existing backup first.");
+      console.log("   [!] Please manually remove or rename the existing backup first\n");
       return false;
     }
-    await $`rm -rf ${backupDir}`;
+    await $`powershell -Command "Remove-Item -Path '${backupDir}' -Recurse -Force"`.quiet();
   }
 
-  // Ask for explicit confirmation
   const proceed = await askYesNo(
     "Do you want to proceed with the backup and installation?",
     true
   );
   if (!proceed) {
-    console.log("Installation cancelled.");
+    console.log("\n   [!] Installation cancelled\n");
     return false;
   }
 
-  console.log(`\nBacking up ${claudeDir} to ${backupDir}...`);
-  // Windows-compatible: Use PowerShell Copy-Item instead of cp
-  await $`powershell -Command "Copy-Item -Path '${claudeDir}' -Destination '${backupDir}' -Recurse -Force"`;
-  console.log("✓ Backup complete.\n");
+  console.log(`\n   [*] Backing up ${installDir} to ${backupDir}...`);
+  await $`powershell -Command "Copy-Item -Path '${installDir}' -Destination '${backupDir}' -Recurse -Force"`.quiet();
+  console.log("   [OK] Backup complete\n");
   return true;
 }
 
@@ -292,106 +216,51 @@ async function detectAndBackup(): Promise<boolean> {
 // MAIN WIZARD
 // =============================================================================
 
-async function gatherConfig(): Promise<WizardConfig> {
-  printHeader("PAI BUNDLE SETUP - WINDOWS EDITION");
+async function gatherConfig(installDir: string): Promise<WizardConfig> {
+  printHeader("PAI CONFIGURATION");
 
-  // In update mode, read existing config first
-  const existing = isUpdateMode ? await readExistingConfig() : {};
+  console.log("This wizard will configure your AI assistant.\n");
+  console.log(`   Installation directory: ${installDir}\n`);
 
-  if (isUpdateMode) {
-    console.log("Update mode: Using existing configuration as defaults.\n");
-    if (existing.daName) console.log(`  Found AI name: ${existing.daName}`);
-    if (existing.userName) console.log(`  Found user: ${existing.userName}`);
-    if (existing.timeZone) console.log(`  Found timezone: ${existing.timeZone}`);
-    if (existing.elevenLabsApiKey) console.log(`  Found ElevenLabs API key: ****${existing.elevenLabsApiKey.slice(-4)}`);
-    console.log();
+  const userName = await ask("What is your name? ");
 
-    // In update mode, just confirm existing values
-    const keepExisting = await askYesNo("Keep existing configuration?", true);
-    if (keepExisting && existing.daName && existing.userName && existing.timeZone) {
-      return {
-        daName: existing.daName,
-        timeZone: existing.timeZone,
-        userName: existing.userName,
-        elevenLabsApiKey: existing.elevenLabsApiKey,
-        elevenLabsVoiceId: existing.elevenLabsVoiceId,
-      };
-    }
-    console.log("\nLet's update your configuration:\n");
-  } else {
-    console.log("This wizard will configure your AI assistant.\n");
-  }
-
-  // Check for existing PAI_DIR environment variable
-  const existingPaiDir = process.env.PAI_DIR;
-  if (existingPaiDir && !isUpdateMode) {
-    console.log(`📍 Existing PAI_DIR detected: ${existingPaiDir}\n`);
-    const useExisting = await askYesNo(
-      `Use existing PAI_DIR (${existingPaiDir}) for installation?`,
-      true
-    );
-    if (useExisting) {
-      console.log(`\nUsing existing PAI_DIR: ${existingPaiDir}\n`);
-    } else {
-      console.log("\n⚠️  Installation will use ~/.claude (standard Claude Code location)");
-      console.log("   You may need to update your PAI_DIR environment variable after installation.\n");
-    }
-  } else if (!isUpdateMode) {
-    const onedrive = process.env.ONEDRIVE || process.env.OneDrive;
-    const defaultDir = onedrive ? `${onedrive}\\.claude` : `${process.env.USERPROFILE}\\.claude`;
-    console.log(`Installation directory: ${defaultDir} (Windows default location)\n`);
-  }
-
-  // Essential questions - use existing values as defaults in update mode
-  const userName = existing.userName
-    ? await askWithDefault("What is your name?", existing.userName)
-    : await ask("What is your name? ");
-
-  const daName = await askWithDefault(
+  const assistantName = await askWithDefault(
     "What would you like to name your AI assistant?",
-    existing.daName || "PAI"
+    "PAI"
   );
 
-  // Get timezone with validation
   const defaultTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const existingTz = existing.timeZone && isValidTimezone(existing.timeZone) ? existing.timeZone : defaultTz;
-  let timeZone = await askWithDefault("What's your timezone?", existingTz);
+  let timeZone = await askWithDefault("What's your timezone?", defaultTz);
 
   while (!isValidTimezone(timeZone)) {
-    console.log(`  ⚠️  "${timeZone}" is not a valid IANA timezone.`);
-    console.log(`     Examples: America/New_York, Europe/London, Asia/Tokyo`);
+    console.log(`   [!] "${timeZone}" is not a valid IANA timezone`);
+    console.log(`   [*] Examples: America/New_York, Europe/London, Asia/Tokyo`);
     timeZone = await askWithDefault("What's your timezone?", defaultTz);
   }
 
-  // Voice - in update mode, default to yes if already configured
-  const defaultWantsVoice = !!existing.elevenLabsApiKey;
   const wantsVoice = await askYesNo(
     "\nDo you want voice notifications? (requires ElevenLabs API key)",
-    defaultWantsVoice
+    false
   );
 
   let elevenLabsApiKey: string | undefined;
   let elevenLabsVoiceId: string | undefined;
 
   if (wantsVoice) {
-    if (existing.elevenLabsApiKey) {
-      const keepKey = await askYesNo(`Keep existing ElevenLabs API key (****${existing.elevenLabsApiKey.slice(-4)})?`, true);
-      elevenLabsApiKey = keepKey ? existing.elevenLabsApiKey : await ask("Enter your ElevenLabs API key: ");
-    } else {
-      elevenLabsApiKey = await ask("Enter your ElevenLabs API key: ");
-    }
+    elevenLabsApiKey = await ask("Enter your ElevenLabs API key: ");
     elevenLabsVoiceId = await askWithDefault(
       "Enter your preferred voice ID",
-      existing.elevenLabsVoiceId || "s3TPKV1kjDlVtZbl4Ksh"
+      "s3TPKV1kjDlVtZbl4Ksh"
     );
   }
 
   return {
-    daName,
+    assistantName,
     timeZone,
     userName,
     elevenLabsApiKey,
     elevenLabsVoiceId,
+    installDir,
   };
 }
 
@@ -402,43 +271,24 @@ async function gatherConfig(): Promise<WizardConfig> {
 function generateSkillMd(config: WizardConfig): string {
   return `---
 name: CORE
-description: Personal AI Infrastructure core. AUTO-LOADS at session start. USE WHEN any session begins OR user asks about identity, response format, contacts, stack preferences.
+description: Personal AI Infrastructure core. AUTO-LOADS at session start.
 ---
 
 # CORE - Personal AI Infrastructure
 
-**Auto-loads at session start.** This skill defines your AI's identity, response format, and core operating principles.
-
 ## Identity
 
 **Assistant:**
-- Name: ${config.daName}
+- Name: ${config.assistantName}
 - Role: ${config.userName}'s AI assistant
-- Operating Environment: Personal AI infrastructure built on Claude Code
+- Operating Environment: Personal AI infrastructure
 
 **User:**
 - Name: ${config.userName}
 
 ---
 
-## First-Person Voice (CRITICAL)
-
-Your AI should speak as itself, not about itself in third person.
-
-**Correct:**
-- "for my system" / "in my architecture"
-- "I can help" / "my delegation patterns"
-- "we built this together"
-
-**Wrong:**
-- "for ${config.daName}" / "for the ${config.daName} system"
-- "the system can" (when meaning "I can")
-
----
-
 ## Stack Preferences
-
-Default preferences (customize in CoreStack.md):
 
 - **Language:** TypeScript preferred over Python
 - **Package Manager:** bun (NEVER npm/yarn/pnpm)
@@ -447,28 +297,11 @@ Default preferences (customize in CoreStack.md):
 
 ---
 
-## Response Format (Optional)
-
-Define a consistent response format for task-based responses:
-
-\`\`\`
-📋 SUMMARY: [One sentence]
-🔍 ANALYSIS: [Key findings]
-⚡ ACTIONS: [Steps taken]
-✅ RESULTS: [Outcomes]
-➡️ NEXT: [Recommended next steps]
-\`\`\`
-
-Customize this format in SKILL.md to match your preferences.
-
----
-
 ## Quick Reference
 
 **Full documentation available in context files:**
 - Contacts: \`Contacts.md\`
 - Stack preferences: \`CoreStack.md\`
-- Security protocols: \`SecurityProtocols.md\`
 `;
 }
 
@@ -484,12 +317,6 @@ Quick reference for frequently contacted people.
 | Name | Role | Email | Notes |
 |------|------|-------|-------|
 | [Add contacts here] | [Role] | [email] | [Notes] |
-
----
-
-## Adding Contacts
-
-To add a new contact, edit this file following the table format above.
 
 ---
 
@@ -538,16 +365,6 @@ Generated: ${new Date().toISOString().split("T")[0]}
 
 ---
 
-## Markup Preferences
-
-| Format | Use | Never Use |
-|--------|-----|-----------|
-| Markdown | All content, docs, notes | HTML for basic content |
-| YAML | Configuration, frontmatter | - |
-| JSON | API responses, data | - |
-
----
-
 ## Code Style
 
 - Prefer explicit over clever
@@ -562,213 +379,109 @@ Generated: ${new Date().toISOString().split("T")[0]}
 // =============================================================================
 
 async function main() {
-  const modeLabel = isUpdateMode ? "UPDATE MODE" : "v1.3.0";
   console.log(`
-╔═══════════════════════════════════════════════════════════════════╗
-║                                                                   ║
-║   ██╗  ██╗ █████╗ ██╗    ██████╗ ██╗   ██╗███╗   ██╗██████╗ ██╗   ║
-║   ██║ ██╔╝██╔══██╗██║    ██╔══██╗██║   ██║████╗  ██║██╔══██╗██║   ║
-║   █████╔╝ ███████║██║    ██████╔╝██║   ██║██╔██╗ ██║██║  ██║██║   ║
-║   ██╔═██╗ ██╔══██║██║    ██╔══██╗██║   ██║██║╚██╗██║██║  ██║██║   ║
-║   ██║  ██╗██║  ██║██║    ██████╔╝╚██████╔╝██║ ╚████║██████╔╝███████╗
-║   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝    ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝╚═════╝ ╚══════╝
-║                                                                   ║
-║              Personal AI Infrastructure - ${modeLabel.padEnd(12)}         ║
-║                                                                   ║
-╚═══════════════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════╗
+║           PAI - Personal AI Infrastructure                   ║
+║                 Windows Native Installer                     ║
+╚══════════════════════════════════════════════════════════════╝
   `);
 
   try {
-    // Step 1: Detect AI systems and create backup
+    const installDir = parseInstallDir();
+    
     printHeader("STEP 1: DETECT & BACKUP");
-    const backupOk = await detectAndBackup();
+    const backupOk = await detectAndBackup(installDir);
     if (!backupOk) {
-      console.log("\nInstallation cancelled.");
       process.exit(1);
     }
 
-    // Step 2: Gather configuration
     printHeader("STEP 2: CONFIGURATION");
-    const config = await gatherConfig();
+    const config = await gatherConfig(installDir);
 
-    // Step 3: Install
     printHeader("STEP 3: INSTALLATION");
 
-    const claudeDir = `${process.env.HOME}/.claude`;
+    console.log("   [*] Creating directory structure...");
+    await mkdir(`${installDir}/skills/CORE/workflows`, { recursive: true });
+    await mkdir(`${installDir}/skills/CORE/tools`, { recursive: true });
+    await mkdir(`${installDir}/history/sessions`, { recursive: true });
+    await mkdir(`${installDir}/history/learnings`, { recursive: true });
+    await mkdir(`${installDir}/history/research`, { recursive: true });
+    await mkdir(`${installDir}/history/decisions`, { recursive: true });
+    await mkdir(`${installDir}/agents`, { recursive: true });
+    await mkdir(`${installDir}/commands`, { recursive: true });
 
-    // Create directory structure
-    console.log("Creating directory structure...");
-    await $`mkdir -p ${claudeDir}/skills/CORE/workflows`;
-    await $`mkdir -p ${claudeDir}/skills/CORE/tools`;
-    await $`mkdir -p ${claudeDir}/history/{sessions,learnings,research,decisions}`;
-    await $`mkdir -p ${claudeDir}/hooks/lib`;
-    await $`mkdir -p ${claudeDir}/tools`;
-    await $`mkdir -p ${claudeDir}/voice`;
-
-    // Generate files
-    console.log("Generating SKILL.md...");
+    console.log("   [*] Generating SKILL.md...");
     const skillMd = generateSkillMd(config);
-    await Bun.write(`${claudeDir}/skills/CORE/SKILL.md`, skillMd);
+    await Bun.write(`${installDir}/skills/CORE/SKILL.md`, skillMd);
 
-    console.log("Generating Contacts.md...");
+    console.log("   [*] Generating Contacts.md...");
     const contactsMd = generateContactsMd(config);
-    await Bun.write(`${claudeDir}/skills/CORE/Contacts.md`, contactsMd);
+    await Bun.write(`${installDir}/skills/CORE/Contacts.md`, contactsMd);
 
-    console.log("Generating CoreStack.md...");
+    console.log("   [*] Generating CoreStack.md...");
     const coreStackMd = generateCoreStackMd(config);
-    await Bun.write(`${claudeDir}/skills/CORE/CoreStack.md`, coreStackMd);
+    await Bun.write(`${installDir}/skills/CORE/CoreStack.md`, coreStackMd);
 
-    // Create .env file (no quotes around values - .env format standard)
-    console.log("Creating .env file...");
+    console.log("   [*] Creating .env file...");
     const envFileContent = `# PAI Environment Configuration
-# Created by Kai Bundle installer - ${new Date().toISOString().split("T")[0]}
+# Created: ${new Date().toISOString().split("T")[0]}
 
-DA=${config.daName}
+ASSISTANT_NAME=${config.assistantName}
+USER_NAME=${config.userName}
 TIME_ZONE=${config.timeZone}
 ${config.elevenLabsApiKey ? `ELEVENLABS_API_KEY=${config.elevenLabsApiKey}` : "# ELEVENLABS_API_KEY="}
 ${config.elevenLabsVoiceId ? `ELEVENLABS_VOICE_ID=${config.elevenLabsVoiceId}` : "# ELEVENLABS_VOICE_ID="}
 `;
-    await Bun.write(`${claudeDir}/.env`, envFileContent);
+    await Bun.write(`${installDir}/.env`, envFileContent);
 
-    // Create settings.json with environment variables for Claude Code
-    // This ensures env vars are available immediately without shell sourcing
-    console.log("Creating settings.json...");
-    const settingsJson: Record<string, unknown> = {
-      env: {
-        DA: config.daName,
-        TIME_ZONE: config.timeZone,
-        PAI_DIR: claudeDir,
-        PAI_SOURCE_APP: config.daName,
+    console.log("   [*] Creating settings.json...");
+    const settingsJson = {
+      identity: {
+        user_name: config.userName,
+        assistant_name: config.assistantName,
+        timezone: config.timeZone,
       },
-    };
-    if (config.elevenLabsApiKey) {
-      (settingsJson.env as Record<string, string>).ELEVENLABS_API_KEY = config.elevenLabsApiKey;
-    }
-    if (config.elevenLabsVoiceId) {
-      (settingsJson.env as Record<string, string>).ELEVENLABS_VOICE_ID = config.elevenLabsVoiceId;
-    }
-
-    // Check for existing settings.json and merge if present
-    const settingsPath = `${claudeDir}/settings.json`;
-    let existingSettings: Record<string, unknown> = {};
-    try {
-      const existingContent = await Bun.file(settingsPath).text();
-      existingSettings = JSON.parse(existingContent);
-    } catch {
-      // No existing settings.json, start fresh
-    }
-
-    // Merge env vars (preserve other settings like hooks)
-    const mergedSettings = {
-      ...existingSettings,
-      env: {
-        ...(existingSettings.env as Record<string, string> || {}),
-        ...(settingsJson.env as Record<string, string>),
+      paths: {
+        skills_dir: `${installDir}/skills`,
+        agents_dir: `${installDir}/agents`,
+        history_dir: `${installDir}/history`,
       },
     };
 
-    await Bun.write(settingsPath, JSON.stringify(mergedSettings, null, 2) + "\n");
-    console.log("✓ Created settings.json with environment variables");
+    await Bun.write(`${installDir}/settings.json`, JSON.stringify(settingsJson, null, 2) + "\n");
+    console.log("   [OK] Created settings.json\n");
 
-    // Add to shell profile
-    console.log("Updating shell profile...");
-    const shell = process.env.SHELL || "/bin/zsh";
-    const shellProfile = shell.includes("zsh")
-      ? `${process.env.HOME}/.zshrc`
-      : `${process.env.HOME}/.bashrc`;
+    printHeader("INSTALLATION COMPLETE");
 
-    const envExports = `
-# PAI Configuration (added by Kai Bundle installer)
-export DA="${config.daName}"
-export TIME_ZONE="${config.timeZone}"
-export PAI_SOURCE_APP="$DA"
-${config.elevenLabsApiKey ? `export ELEVENLABS_API_KEY="${config.elevenLabsApiKey}"` : ""}
-${config.elevenLabsVoiceId ? `export ELEVENLABS_VOICE_ID="${config.elevenLabsVoiceId}"` : ""}
-`;
+    console.log(`
+Your PAI system is configured:
 
-    const existingProfile = await Bun.file(shellProfile).text().catch(() => "");
-    if (!existingProfile.includes("PAI Configuration")) {
-      await Bun.write(shellProfile, existingProfile + "\n" + envExports);
-      console.log(`Added environment variables to ${shellProfile}`);
-    } else {
-      console.log(`PAI environment variables already exist in ${shellProfile}`);
-    }
-
-    // Source the shell profile to make variables available
-    console.log("Sourcing shell profile...");
-    try {
-      // Export to current process
-      process.env.DA = config.daName;
-      process.env.TIME_ZONE = config.timeZone;
-      process.env.PAI_SOURCE_APP = config.daName;
-      if (config.elevenLabsApiKey) process.env.ELEVENLABS_API_KEY = config.elevenLabsApiKey;
-      if (config.elevenLabsVoiceId) process.env.ELEVENLABS_VOICE_ID = config.elevenLabsVoiceId;
-      console.log("Environment variables set for current session.");
-    } catch (e) {
-      // Silently continue - environment is exported to file
-    }
-
-    // Summary
-    printHeader(isUpdateMode ? "UPDATE COMPLETE" : "INSTALLATION COMPLETE");
-
-    if (isUpdateMode) {
-      console.log(`
-Your Kai system has been updated:
-
-  📁 Installation: ~/.claude
-  🤖 Assistant Name: ${config.daName}
-  👤 User: ${config.userName}
-  🌍 Timezone: ${config.timeZone}
-  🔊 Voice: ${config.elevenLabsApiKey ? "Enabled" : "Disabled"}
-
-Files updated:
-  - ~/.claude/skills/CORE/SKILL.md
-  - ~/.claude/skills/CORE/Contacts.md
-  - ~/.claude/skills/CORE/CoreStack.md
-  - ~/.claude/.env
-  - ~/.claude/settings.json
-
-Next steps:
-
-  1. Re-install any packs that have been updated (check changelog)
-  2. Restart Claude Code to activate changes
-
-Your existing hooks, history, and customizations have been preserved.
-`);
-    } else {
-      console.log(`
-Your Kai system is configured:
-
-  📁 Installation: ~/.claude
-  💾 Backup: ~/.claude-BACKUP
-  🤖 Assistant Name: ${config.daName}
-  👤 User: ${config.userName}
-  🌍 Timezone: ${config.timeZone}
-  🔊 Voice: ${config.elevenLabsApiKey ? "Enabled" : "Disabled"}
+   [*] Installation: ${installDir}
+   [*] Backup: ${installDir}-BACKUP
+   [*] Assistant Name: ${config.assistantName}
+   [*] User: ${config.userName}
+   [*] Timezone: ${config.timeZone}
+   [*] Voice: ${config.elevenLabsApiKey ? "Enabled" : "Disabled"}
 
 Files created:
-  - ~/.claude/skills/CORE/SKILL.md
-  - ~/.claude/skills/CORE/Contacts.md
-  - ~/.claude/skills/CORE/CoreStack.md
-  - ~/.claude/.env
-  - ~/.claude/settings.json (env vars for Claude Code)
+   - ${installDir}/skills/CORE/SKILL.md
+   - ${installDir}/skills/CORE/Contacts.md
+   - ${installDir}/skills/CORE/CoreStack.md
+   - ${installDir}/.env
+   - ${installDir}/settings.json
 
 Next steps:
 
-  1. Install the packs IN ORDER by giving each pack file to your AI:
-     - kai-hook-system.md
-     - kai-history-system.md
-     - kai-core-install.md
-     - kai-voice-system.md (optional, requires ElevenLabs)
-
-  2. Restart Claude Code to activate hooks
-
-Your backup is at ~/.claude-BACKUP if you need to restore.
+   1. Configure API keys as environment variables
+   2. Customize settings.json
+   3. Add PAI directory to your AI client:
+      - Cherry Studio: Add to Knowledge Base
+      - Claude Desktop: Set working directory
+   4. Environment variable: PAI_DIR=${installDir}
 `);
-    }
 
   } catch (error) {
-    console.error("\n❌ Installation failed:", error);
+    console.error("\n   [!] Installation failed:", error);
     process.exit(1);
   } finally {
     rl.close();

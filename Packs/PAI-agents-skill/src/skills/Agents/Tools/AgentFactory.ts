@@ -24,7 +24,7 @@ import { parse as parseYaml } from "yaml";
 import Handlebars from "handlebars";
 
 // Paths - adjust PAI_DIR as needed
-const PAI_DIR = process.env.PAI_ROOT || process.env.PAI_DIR || join(process.env.HOME || '', '.claude');
+const PAI_DIR = process.env.PAI_DIR || join(process.env.HOME || '', '.claude');
 const TRAITS_PATH = `${PAI_DIR}/skills/Agents/Data/Traits.yaml`;
 const TEMPLATE_PATH = `${PAI_DIR}/skills/Agents/Templates/DynamicAgent.hbs`;
 

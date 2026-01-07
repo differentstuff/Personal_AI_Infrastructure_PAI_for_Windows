@@ -63,7 +63,7 @@ bun run Bundles/PAI/install.ts
 
 ```powershell
 # Copy pack to workspace directly
-Copy-Item -Recurse .\Packs\PackName\src\ $env:PAI_Root\.claude\
+Copy-Item -Recurse .\Packs\PackName\src\ $env:PAI_DIR\.claude\
 ```
 
 ## Usage
@@ -81,7 +81,7 @@ Use the [SkillName] skill to do X, Y, Z.
 
 ```powershell
 # Import module and use
-Import-Module $env:PAI_Root\.claude\tools\modules\PAI\PAI.psm1
+Import-Module $env:PAI_DIR\.claude\tools\modules\PAI\PAI.psm1
 Get-PAISkills
 ```
 
@@ -110,10 +110,10 @@ After installation, verify with:
 
 ```powershell
 # Check if files exist
-Test-Path $env:PAI_Root\.claude\skills\YourSkill
+Test-Path $env:PAI_DIR\.claude\skills\YourSkill
 
 # Check if agents exist
-Get-ChildItem $env:PAI_Root\.claude\agents -Filter "*your-agent*"
+Get-ChildItem $env:PAI_DIR\.claude\agents -Filter "*your-agent*"
 
 # Run diagnostic
 . C:\Temp\Personal_AI_Infrastructure_PAI_for_Windows_v2\Tools\CheckPAIState.md
@@ -151,7 +151,7 @@ Before installing, ensure you have:
 - [x] Windows 10/11
 - [x] PowerShell 7.5+ (`pwsh --version`)
 - [x] Bun 1.1+ (`bun --version`)
-- [x] PAI workspace initialized (`$env:PAI_Root\.claude`)
+- [x] PAI workspace initialized (`$env:PAI_DIR\.claude`)
 
 ## Installation Steps
 
@@ -165,7 +165,7 @@ pwsh --version
 bun --version
 
 # Check PAI workspace
-Test-Path $env:PAI_Root\.claude
+Test-Path $env:PAI_DIR\.claude
 ```
 
 ### Step 2: Choose Installation Method
@@ -185,7 +185,7 @@ bun run Packs/PackName/src/install.ts
 # Copy all files to workspace
 Copy-Item -Recurse `
   "C:\Temp\Personal_AI_Infrastructure_PAI_for_Windows_v2\Packs\PackName\src\*" `
-  "$env:PAI_Root\.claude\" `
+  "$env:PAI_DIR\.claude\" `
   -Force
 ```
 
@@ -193,8 +193,8 @@ Copy-Item -Recurse `
 
 ```powershell
 # Add to .env if needed
-Add-Content $env:PAI_Root\.claude\.env "`n# Pack Configuration"
-Add-Content $env:PAI_Root\.claude\.env "PACK_SETTING=value"
+Add-Content $env:PAI_DIR\.claude\.env "`n# Pack Configuration"
+Add-Content $env:PAI_DIR\.claude\.env "PACK_SETTING=value"
 ```
 
 ### Step 4: Verify Installation
@@ -222,11 +222,11 @@ To remove this pack:
 
 ```powershell
 # Remove pack files
-Remove-Item $env:PAI_Root\.claude\skills\YourSkill -Recurse -Force
-Remove-Item $env:PAI_Root\.claude\agents\your-agent.md -Force
+Remove-Item $env:PAI_DIR\.claude\skills\YourSkill -Recurse -Force
+Remove-Item $env:PAI_DIR\.claude\agents\your-agent.md -Force
 
 # Remove configuration from .env
-(Get-Content $env:PAI_Root\.claude\.env) -notmatch "PACK_SETTING" | Set-Content $env:PAI_Root\.claude\.env
+(Get-Content $env:PAI_DIR\.claude\.env) -notmatch "PACK_SETTING" | Set-Content $env:PAI_DIR\.claude\.env
 ```
 
 ## Troubleshooting
@@ -236,8 +236,8 @@ Remove-Item $env:PAI_Root\.claude\agents\your-agent.md -Force
 **Solution**: Check permissions:
 ```powershell
 # Check if you can write to workspace
-Test-Path $env:PAI_Root\.claude
-Get-Acl $env:PAI_Root\.claude | Select-Object AccessToString
+Test-Path $env:PAI_DIR\.claude
+Get-Acl $env:PAI_DIR\.claude | Select-Object AccessToString
 ```
 
 ### Issue: Agent not appearing
@@ -245,7 +245,7 @@ Get-Acl $env:PAI_Root\.claude | Select-Object AccessToString
 **Solution**: Verify agent format:
 ```powershell
 # Check agent file format
-Get-Content $env:PAI_Root\.claude\agents\your-agent.md -TotalCount 10
+Get-Content $env:PAI_DIR\.claude\agents\your-agent.md -TotalCount 10
 
 # Should have proper frontmatter with name, description, instruction fields
 ```
@@ -269,7 +269,7 @@ Checklist to verify the pack is correctly installed and functioning.
 ### Required Files Check
 
 ```powershell
-$workspace = $env:PAI_Root + "\.claude"
+$workspace = $env:PAI_DIR + "\.claude"
 
 # List files this pack should have installed
 $expectedFiles = @(
@@ -447,7 +447,7 @@ function Test-PackInstallation {
         [string]$PackName = "YourPack"
     )
     
-    $workspace = $env:PAI_Root + "\.claude"
+    $workspace = $env:PAI_DIR + "\.claude"
     $errors = 0
     $warnings = 0
     $success = 0

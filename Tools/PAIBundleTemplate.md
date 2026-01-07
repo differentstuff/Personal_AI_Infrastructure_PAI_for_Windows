@@ -54,7 +54,7 @@ List any external dependencies:
 ## Platform
 
 - Windows 10/11 only
-- Requires `$env:PAI_Root\.claude` workspace
+- Requires `$env:PAI_DIR\.claude` workspace
 - Compatible with Cherry Studio, Claude Code
 
 ## Verification
@@ -63,10 +63,10 @@ After installation, verify with:
 
 ```powershell
 # Check skill installation
-Get-ChildItem $env:PAI_Root\.claude\skills
+Get-ChildItem $env:PAI_DIR\.claude\skills
 
 # Check agents
-Get-ChildItem $env:PAI_Root\.claude\agents
+Get-ChildItem $env:PAI_DIR\.claude\agents
 
 # Run diagnostic
 . Tools/CheckPAIState.md

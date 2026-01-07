@@ -111,12 +111,12 @@ Edit `$env:OneDrive\.claude\settings.json`:
   "_version": "2.0.0",
   
   "paths": {
-    "pai_root": "${PAI_ROOT}",
-    "skills_dir": "${PAI_ROOT}\\skills",
-    "agents_dir": "${PAI_ROOT}\\agents",
-    "commands_dir": "${PAI_ROOT}\\commands",
-    "history_dir": "${PAI_ROOT}\\history",
-    "tools_dir": "${PAI_ROOT}\\tools"
+    "pai_dir": "${PAI_DIR}",
+    "skills_dir": "${PAI_DIR}\\skills",
+    "agents_dir": "${PAI_DIR}\\agents",
+    "commands_dir": "${PAI_DIR}\\commands",
+    "history_dir": "${PAI_DIR}\\history",
+    "tools_dir": "${PAI_DIR}\\tools"
   },
   
   "user": {

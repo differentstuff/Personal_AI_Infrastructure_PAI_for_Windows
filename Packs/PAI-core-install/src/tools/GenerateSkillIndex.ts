@@ -11,7 +11,7 @@ import { readdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
-const PAI_DIR = process.env.PAI_ROOT || process.env.PAI_DIR || join(process.env.HOME || '', '.claude');
+const PAI_DIR = process.env.PAI_DIR || join(process.env.HOME || '', '.claude');
 const SKILLS_DIR = join(PAI_DIR, 'skills');
 const OUTPUT_FILE = join(SKILLS_DIR, 'skill-index.json');
 

@@ -8,7 +8,7 @@ Run this diagnostic check to verify your PAI installation:
 
 ```powershell
 # Navigate to your PAI workspace
-cd $env:PAI_Root\.claude
+cd $env:PAI_DIR\.claude
 
 # Check installation state
 Get-ChildItem -Recurse -Depth 2 | Where-Object { $_.Extension -eq '.md' } | Select-Object FullName
@@ -88,7 +88,7 @@ Get-Content .\agents\assistant.md -TotalCount 5
 Import-Module .\tools\modules\PAI\PAI.psm1
 
 # Or add to PowerShell profile:
-# Add-Content $PROFILE "`nImport-Module `$env:PAI_Root\.claude\tools\modules\PAI\PAI.psm1"
+# Add-Content $PROFILE "`nImport-Module `$env:PAI_DIR\.claude\tools\modules\PAI\PAI.psm1"
 ```
 
 ## Verification Commands
@@ -98,7 +98,7 @@ Import-Module .\tools\modules\PAI\PAI.psm1
 ```powershell
 function Test-PAIInstallation {
     $errors = @()
-    $workspace = $env:PAI_Root + '\.claude'
+    $workspace = $env:PAI_DIR + '\.claude'
     
     # Check core components
     $requiredPaths = @(
@@ -189,7 +189,7 @@ Verify `$PAI_DIR` is set correctly:
 Get-ChildItem Env:PAI_DIR
 
 # Set if missing
-[Environment]::SetEnvironmentVariable("PAI_DIR", "$env:PAI_Root\.claude", "User")
+[Environment]::SetEnvironmentVariable("PAI_DIR", "$env:PAI_DIR\.claude", "User")
 
 # Restart PowerShell to apply changes
 ```
