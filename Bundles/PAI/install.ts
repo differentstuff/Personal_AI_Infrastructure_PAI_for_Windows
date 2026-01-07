@@ -59,6 +59,55 @@ interface WizardConfig {
   installDir: string;
 }
 
+interface ExistingConfig {
+  assistantName?: string;
+  timeZone?: string;
+  userName?: string;
+  elevenLabsApiKey?: string;
+  elevenLabsVoiceId?: string;
+}
+
+async function readExistingConfig(installDir: string): Promise<ExistingConfig> {
+  const config: ExistingConfig = {};
+  
+  try {
+    const settingsPath = `${installDir}/settings.json`;
+    if (existsSync(settingsPath)) {
+      const settingsContent = await Bun.file(settingsPath).text();
+      const settings = JSON.parse(settingsContent);
+      
+      if (settings.identity) {
+        config.userName = settings.identity.user_name;
+        config.assistantName = settings.identity.assistant_name;
+        config.timeZone = settings.identity.timezone;
+      }
+    }
+  } catch {
+    // No settings.json, continue with empty config
+  }
+  
+  // Try to read from .env file for API keys
+  try {
+    const envPath = `${installDir}/.env`;
+    if (existsSync(envPath)) {
+      const envContent = await Bun.file(envPath).text();
+      const lines = envContent.split("\n");
+      for (const line of lines) {
+        const match = line.match(/^([A-Z_]+)=(.*)$/);
+        if (match) {
+          const [, key, value] = match;
+          if (key === "ELEVENLABS_API_KEY") config.elevenLabsApiKey = value;
+          if (key === "ELEVENLABS_VOICE_ID") config.elevenLabsVoiceId = value;
+        }
+      }
+    }
+  } catch {
+    // No .env file, continue
+  }
+  
+  return config;
+}
+
 // =============================================================================
 // UTILITIES
 // =============================================================================
@@ -222,14 +271,40 @@ async function gatherConfig(installDir: string): Promise<WizardConfig> {
   console.log("This wizard will configure your AI assistant.\n");
   console.log(`   Installation directory: ${installDir}\n`);
 
-  const userName = await ask("What is your name? ");
+  // Read existing configuration if available
+  const existing = await readExistingConfig(installDir);
+  
+  if (existing.userName || existing.assistantName) {
+    console.log("   [*] Found existing configuration:");
+    if (existing.userName) console.log(`       User: ${existing.userName}`);
+    if (existing.assistantName) console.log(`       Assistant: ${existing.assistantName}`);
+    if (existing.timeZone) console.log(`       Timezone: ${existing.timeZone}`);
+    console.log();
+    
+    const keepExisting = await askYesNo("Keep existing configuration?", true);
+    if (keepExisting && existing.userName && existing.assistantName && existing.timeZone) {
+      return {
+        assistantName: existing.assistantName,
+        timeZone: existing.timeZone,
+        userName: existing.userName,
+        elevenLabsApiKey: existing.elevenLabsApiKey,
+        elevenLabsVoiceId: existing.elevenLabsVoiceId,
+        installDir,
+      };
+    }
+    console.log("   [*] Updating configuration:\n");
+  }
+
+  const userName = existing.userName
+    ? await askWithDefault("What is your name?", existing.userName)
+    : await ask("What is your name? ");
 
   const assistantName = await askWithDefault(
     "What would you like to name your AI assistant?",
-    "PAI"
+    existing.assistantName || "PAI"
   );
 
-  const defaultTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const defaultTz = existing.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   let timeZone = await askWithDefault("What's your timezone?", defaultTz);
 
   while (!isValidTimezone(timeZone)) {
@@ -238,19 +313,28 @@ async function gatherConfig(installDir: string): Promise<WizardConfig> {
     timeZone = await askWithDefault("What's your timezone?", defaultTz);
   }
 
+  const defaultWantsVoice = !!existing.elevenLabsApiKey;
   const wantsVoice = await askYesNo(
     "\nDo you want voice notifications? (requires ElevenLabs API key)",
-    false
+    defaultWantsVoice
   );
 
   let elevenLabsApiKey: string | undefined;
   let elevenLabsVoiceId: string | undefined;
 
   if (wantsVoice) {
-    elevenLabsApiKey = await ask("Enter your ElevenLabs API key: ");
+    if (existing.elevenLabsApiKey) {
+      const keepKey = await askYesNo(
+        `Keep existing ElevenLabs API key (****${existing.elevenLabsApiKey.slice(-4)})?`,
+        true
+      );
+      elevenLabsApiKey = keepKey ? existing.elevenLabsApiKey : await ask("Enter your ElevenLabs API key: ");
+    } else {
+      elevenLabsApiKey = await ask("Enter your ElevenLabs API key: ");
+    }
     elevenLabsVoiceId = await askWithDefault(
       "Enter your preferred voice ID",
-      "s3TPKV1kjDlVtZbl4Ksh"
+      existing.elevenLabsVoiceId || "s3TPKV1kjDlVtZbl4Ksh"
     );
   }
 
@@ -400,19 +484,28 @@ async function main() {
 
     printHeader("STEP 3: INSTALLATION");
 
-    console.log("   [*] Creating directory structure...");
-    await mkdir(`${installDir}/skills/CORE/workflows`, { recursive: true });
-    await mkdir(`${installDir}/skills/CORE/tools`, { recursive: true });
-    await mkdir(`${installDir}/history/sessions`, { recursive: true });
-    await mkdir(`${installDir}/history/learnings`, { recursive: true });
-    await mkdir(`${installDir}/history/research`, { recursive: true });
-    await mkdir(`${installDir}/history/decisions`, { recursive: true });
-    await mkdir(`${installDir}/agents`, { recursive: true });
-    await mkdir(`${installDir}/commands`, { recursive: true });
+	// Read existing configuration to determine if this is an update
+	const existingConfig = await readExistingConfig(installDir);
+	const isUpdate = !!(existingConfig.userName || existingConfig.assistantName);
 
-    console.log("   [*] Generating SKILL.md...");
-    const skillMd = generateSkillMd(config);
-    await Bun.write(`${installDir}/skills/CORE/SKILL.md`, skillMd);
+	if (!isUpdate) {
+	  console.log("   [*] Creating directory structure...");
+	  await mkdir(`${installDir}/skills/CORE/workflows`, { recursive: true });
+	  await mkdir(`${installDir}/skills/CORE/tools`, { recursive: true });
+	  await mkdir(`${installDir}/history/sessions`, { recursive: true });
+	  await mkdir(`${installDir}/history/learnings`, { recursive: true });
+	  await mkdir(`${installDir}/history/research`, { recursive: true });
+	  await mkdir(`${installDir}/history/decisions`, { recursive: true });
+	  await mkdir(`${installDir}/agents`, { recursive: true });
+	  await mkdir(`${installDir}/commands`, { recursive: true });
+	} else {
+	  console.log("   [*] Using existing directory structure...");
+	}
+
+	console.log("   [*] Generating SKILL.md...");
+	const skillMd = generateSkillMd(config);
+	await Bun.write(`${installDir}/skills/CORE/SKILL.md`, skillMd);
+
 
     console.log("   [*] Generating Contacts.md...");
     const contactsMd = generateContactsMd(config);

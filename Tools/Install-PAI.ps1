@@ -132,19 +132,26 @@ function Set-PAIDirectory {
         Write-Host ""
         Write-Host "   Select installation location:" -ForegroundColor White
         Write-Host "   1. $($env:USERPROFILE)\.claude" -ForegroundColor Gray
-        Write-Host "   2. $($env:OneDrive)\PAI" -ForegroundColor Gray
+        Write-Host "   2. $($env:OneDrive)\PAI\.claude" -ForegroundColor Gray
         Write-Host "   3. Custom path" -ForegroundColor Gray
         Write-Host ""
-        
+    
         $selection = Read-Host "   Enter selection (1-3)"
-        
+    
         switch ($selection) {
             "1" { $InstallDir = "$($env:USERPROFILE)\.claude" }
-            "2" { $InstallDir = "$($env:OneDrive)\PAI" }
+            "2" { $InstallDir = "$($env:OneDrive)\PAI\.claude" }
             "3" { 
-                $InstallDir = Read-Host "   Enter custom path"
-                if ([string]::IsNullOrEmpty($InstallDir)) {
+                $customPath = Read-Host "   Enter custom path"
+                if ([string]::IsNullOrEmpty($customPath)) {
                     throw "Custom path cannot be empty"
+                }
+                # Append .claude to custom path if not already present
+                if (-not $customPath.EndsWith('\.claude') -and -not $customPath.EndsWith('/.claude')) {
+                    $InstallDir = "$customPath\.claude"
+                    Write-Host "   [*] Appending .claude subdirectory: $InstallDir" -ForegroundColor Yellow
+                } else {
+                    $InstallDir = $customPath
                 }
             }
             default { $InstallDir = "$($env:USERPROFILE)\.claude" }
