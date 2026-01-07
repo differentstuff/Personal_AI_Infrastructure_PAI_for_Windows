@@ -29,10 +29,9 @@ winget install Microsoft.PowerShell
 
 **2. Clone or download this repository:**
 ```powershell
-cd C:\Temp
-git clone https://github.com/differentstuff/Personal_AI_Infrastructure_PAI_for_Windows.git PAI_Windows_v2
+git clone https://github.com/differentstuff/Personal_AI_Infrastructure_PAI_for_Windows.git
+cd Personal_AI_Infrastructure_PAI_for_Windows
 ```
-*Alternative: Download ZIP and extract to `C:\Temp\PAI_Windows_v2`*
 
 **3. Run the Windows installer:**
 
@@ -43,8 +42,7 @@ Doubleclick on: Tools\setup.bat
 
 ```powershell
 # Powershell
-cd PAI_Windows_v2\Tools
-.\Install-PAI.ps1
+.\Tools\Install-PAI.ps1
 ```
 
 The installer will:
